@@ -1,0 +1,13 @@
+/* kredit-maliki: Template oleh Maliki Saputra (@malikisaputra) — https://malikisaputra.biz.id. Lisensi Nonkomersial Maliki Studio: wajib kredit, dilarang dijual (lihat LICENSE). */
+/* TEMA — Iuran & Kas MPN. Warna & font dari PRD bagian 6. */
+:root {
+  --tema-utama: #ffffff;    /* tombol utama & penanda aktif: putih di atas latar hijau */
+  --tema-aksen: #ffffff;    /* cincin progres, logo, titik status, fokus */
+  --tema-radius: 6px;       /* sudut tajam: kesan majalah */
+  --tema-font: "DM Sans", system-ui, sans-serif;                 /* isi teks */
+  --tema-font-judul: "Poppins", system-ui, sans-serif;           /* judul: Poppins ExtraBold (800) */
+  --tema-latar: #027B5E;    /* latar halaman (PRD) */
+  --tema-panel: #027B5E;    /* kartu/panel/form: sama dengan latar, dipisah garis tipis */
+  --tema-nav: #027B5E;      /* header & blok saldo */
+  --tema-teks: #ffffff;     /* teks utama (PRD) */
+}
