@@ -1,45 +1,46 @@
 /* kredit-maliki: Template oleh Maliki Saputra (@malikisaputra) — https://malikisaputra.biz.id. Lisensi Nonkomersial Maliki Studio: wajib kredit, dilarang dijual (lihat LICENSE). */
 /* Data contoh (fiktif). Dipakai saat aplikasi pertama kali dibuka atau setelah "Isi data contoh".
-   Bulan dihitung relatif ke hari ini supaya contoh selalu terasa "bulan berjalan". */
+   Iuran dicatat per minggu (Senin–Minggu); kunci pekan = tanggal Senin. Pekan dihitung relatif ke hari ini. */
 window.DATA_CONTOH = function () {
   var kini = new Date();
-  function bln(geser) { var d = new Date(kini.getFullYear(), kini.getMonth() + geser, 1); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); }
-  function tgl(b, h) { return b + '-' + String(h).padStart(2, '0'); }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function geser(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
+  var hari = iso(kini);
+  var senin0 = geser(kini, -((kini.getDay() + 6) % 7));
+  function batasi(t) { return t > hari ? hari : t; }
   var nama = [
-    ['Budi Santoso', 'A', '01', '081234567801'], ['Siti Rahmawati', 'A', '02', '081234567802'],
-    ['Agus Wibowo', 'A', '03', '081234567803'], ['Dewi Lestari', 'A', '04', '081234567804'],
-    ['Hendra Gunawan', 'A', '05', '081234567805'], ['Rina Marlina', 'A', '06', '081234567806'],
-    ['Yusuf Hidayat', 'A', '07', '081234567807'], ['Fitri Handayani', 'A', '08', '081234567808'],
-    ['Joko Prasetyo', 'A', '09', ''], ['Nur Aisyah', 'B', '01', '081234567810'],
-    ['Teguh Saputra', 'B', '02', '081234567811'], ['Wulan Sari', 'B', '03', '081234567812'],
-    ['Bambang Irawan', 'B', '04', '081234567813'], ['Maya Puspita', 'B', '05', '081234567814'],
-    ['Dodi Kurniawan', 'B', '06', '081234567815'], ['Lilis Suryani', 'B', '07', '081234567816'],
-    ['Rudi Hartono', 'B', '08', '081234567817'], ['Ani Wijayanti', 'B', '09', '081234567818']
+    ['Budi Santoso', '081234567801'], ['Siti Rahmawati', '081234567802'], ['Agus Wibowo', '081234567803'],
+    ['Dewi Lestari', '081234567804'], ['Hendra Gunawan', '081234567805'], ['Rina Marlina', '081234567806'],
+    ['Yusuf Hidayat', '081234567807'], ['Fitri Handayani', '081234567808'], ['Joko Prasetyo', ''],
+    ['Nur Aisyah', '081234567810'], ['Teguh Saputra', '081234567811'], ['Wulan Sari', '081234567812'],
+    ['Bambang Irawan', '081234567813'], ['Maya Puspita', '081234567814'], ['Dodi Kurniawan', '081234567815'],
+    ['Lilis Suryani', '081234567816'], ['Rudi Hartono', '081234567817'], ['Ani Wijayanti', '081234567818']
   ];
-  var warga = nama.map(function (n, i) { return { id: 'w' + (i + 1), nama: n[0], blok: n[1], no: n[2], hp: n[3] }; });
-  var iuran = 50000;
-  var b2 = bln(-2), b1 = bln(-1), b0 = bln(0);
-  var bayar = {}; bayar[b2] = {}; bayar[b1] = {}; bayar[b0] = {};
-  var kas = [], n = 0;
-  function masuk(b, w, h) { bayar[b][w.id] = tgl(b, h); kas.push({ id: 'k' + (++n), tgl: tgl(b, h), jenis: 'masuk', ket: 'Iuran ' + w.nama, jumlah: iuran, ref: b + ':' + w.id }); }
-  warga.forEach(function (w, i) {
-    masuk(b2, w, 2 + (i % 8));
-    if (i !== 8 && i !== 14) masuk(b1, w, 1 + (i % 9));
-    if ([0, 1, 3, 4, 6, 9, 10, 12, 13, 16, 17].indexOf(i) >= 0) masuk(b0, w, 1 + (i % 6));
-  });
-  kas.unshift({ id: 'k0', tgl: tgl(b2, 1), jenis: 'masuk', ket: 'Saldo awal dari pengurus lama', jumlah: 1250000 });
+  var warga = nama.map(function (n, i) { return { id: 'w' + (i + 1), nama: n[0], hp: n[1] }; });
+  var iuran = 5000;
+  var bayar = {}, kas = [], n = 0;
+  for (var p = -5; p <= 0; p++) {
+    var mon = geser(senin0, p * 7), key = iso(mon);
+    bayar[key] = {};
+    warga.forEach(function (w, i) {
+      var bayarIni = p < 0 ? ((i + p + 12) % 6 !== 0) : (i % 2 === 0);
+      if (!bayarIni) return;
+      var t = batasi(iso(geser(mon, i % 4)));
+      bayar[key][w.id] = t;
+      kas.push({ id: 'k' + (++n), tgl: t, jenis: 'masuk', ket: 'Iuran ' + w.nama, jumlah: iuran, ref: key + ':' + w.id });
+    });
+  }
+  kas.unshift({ id: 'k0', tgl: iso(geser(senin0, -35)), jenis: 'masuk', ket: 'Saldo awal dari pengurus lama', jumlah: 250000 });
   kas.push(
-    { id: 'kx1', tgl: tgl(b2, 12), jenis: 'keluar', ket: 'Honor petugas sampah', jumlah: 300000 },
-    { id: 'kx2', tgl: tgl(b2, 20), jenis: 'keluar', ket: 'Lampu jalan blok B (2 buah)', jumlah: 170000 },
-    { id: 'kx3', tgl: tgl(b1, 12), jenis: 'keluar', ket: 'Honor petugas sampah', jumlah: 300000 },
-    { id: 'kx4', tgl: tgl(b1, 17), jenis: 'masuk', ket: 'Sumbangan acara 17-an (sisa)', jumlah: 215000 },
-    { id: 'kx5', tgl: tgl(b1, 25), jenis: 'keluar', ket: 'Kerja bakti: konsumsi', jumlah: 185000 },
-    { id: 'kx6', tgl: tgl(b0, 5), jenis: 'keluar', ket: 'Honor petugas sampah', jumlah: 300000 },
-    { id: 'kx7', tgl: tgl(b0, 6), jenis: 'keluar', ket: 'Cat pos ronda', jumlah: 142000 }
+    { id: 'kx1', tgl: iso(geser(senin0, -26)), jenis: 'keluar', ket: 'Beli perlengkapan', jumlah: 60000 },
+    { id: 'kx2', tgl: iso(geser(senin0, -17)), jenis: 'masuk', ket: 'Sumbangan kegiatan (sisa)', jumlah: 30000 },
+    { id: 'kx3', tgl: iso(geser(senin0, -11)), jenis: 'keluar', ket: 'Konsumsi kegiatan', jumlah: 45000 },
+    { id: 'kx4', tgl: batasi(iso(geser(senin0, 1))), jenis: 'keluar', ket: 'Beli alat tulis', jumlah: 25000 }
   );
   return {
     versi: 1,
-    pengaturan: { iuran: iuran, batas: 10, bendahara: 'Bu Wulan (Bendahara)', bayarKe: 'tunai ke Bu Wulan (B-03) atau transfer, lalu kirim bukti ke WA ini' },
+    pengaturan: { iuran: iuran, batas: 'setiap minggu', bendahara: 'Bu Wulan (Bendahara)', bayarKe: 'tunai ke bendahara atau transfer, lalu kirim bukti ke WA ini' },
     warga: warga, bayar: bayar, kas: kas
   };
 };
