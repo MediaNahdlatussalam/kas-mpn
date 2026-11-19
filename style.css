@@ -290,3 +290,11 @@ html.mode-pilih [data-pilih-hover] { outline: 2px solid var(--tema-aksen) !impor
 
 /* Cetak laporan: teks hitam di atas putih, juga saat mode gelap */
 @media print { #pn-lap, #pn-lap * { color: #000 !important; background: transparent !important; border-color: #888 !important; box-shadow: none !important; } }
+
+/* Mode lihat-saja untuk anggota: kontrol pengubah data disembunyikan (penjaga sebenarnya ada di aturan Firestore) */
+html:not([data-peran="admin"]) #btnTambahWarga,
+html:not([data-peran="admin"]) #btnAtur,
+html:not([data-peran="admin"]) #formKas,
+html:not([data-peran="admin"]) .data-aksi { display: none; }
+.ketuk:disabled { opacity: 1; cursor: default; color: inherit; }
+.tautan-kecil { background: none; border: 0; padding: 12px 4px; margin: -12px 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }

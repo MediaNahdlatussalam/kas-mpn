@@ -48,11 +48,17 @@ var KONFIG = {
   };
 
   /* ========== 2. Data & simpan ========== */
-  var D;
-  function muat() {
-    try { D = JSON.parse(localStorage.getItem(KUNCI) || 'null'); } catch (e) { D = null; }
-    if (!D || !Array.isArray(D.warga)) D = window.DATA_CONTOH();
-    migrasi(D);
+  var D, ADMIN = false, emailMasuk = '';
+  /* Data kini disimpan online (Firestore) dan dipakai bersama; localStorage tidak dipakai lagi untuk data. */
+  function muat() { D = { versi: 1, pengaturan: {}, warga: [], bayar: {}, bukti: {}, kas: [] }; migrasi(D); }
+  function pesanGalat(e) {
+    var c = (e && e.code) || '';
+    if (/invalid-credential|wrong-password|user-not-found|invalid-email/.test(c)) return 'Email atau kata sandi salah.';
+    if (/too-many-requests/.test(c)) return 'Terlalu banyak percobaan. Coba lagi beberapa menit lagi.';
+    if (/network/.test(c)) return 'Tidak ada koneksi internet.';
+    if (/permission-denied/.test(c)) return 'Akun ini tidak punya izin mengubah data.';
+    if (c === 'belum-siap') return 'Layanan online belum siap. Coba lagi sebentar.';
+    return 'Terjadi kesalahan (' + (c || 'tidak dikenal') + ').';
   }
   // Tambah field baru di sini supaya data lama tetap terbaca.
   function migrasi(d) {
@@ -76,10 +82,10 @@ var KONFIG = {
       delete d.bukti[k];
     });
   }
-  function simpan() { try { localStorage.setItem(KUNCI, JSON.stringify(D)); } catch (e) { toast('Gagal menyimpan: penyimpanan browser penuh atau diblokir'); } }
+  function simpan() { if (!ADMIN || !window.BACKEND) return; BACKEND.tulis(D).catch(function (e) { toast('Gagal menyimpan: ' + pesanGalat(e)); }); }
   var kini = new Date();
   function awalIdx(y, m) { var t = hariIni(), idx = 0; mingguBulan(y, m).forEach(function (k, i) { if (k <= t) idx = i; }); return idx; }
-  var S = { tahun: kini.getFullYear(), bulan: kini.getMonth(), minggu: awalIdx(kini.getFullYear(), kini.getMonth()), saring: 'semua', cari: '', tab: 'ingat' };
+  var S = { tahun: kini.getFullYear(), bulan: kini.getMonth(), minggu: awalIdx(kini.getFullYear(), kini.getMonth()), saring: 'semua', cari: '', tab: 'ingat', memuat: true };
   function idxMinggu() { var n = mingguBulan(S.tahun, S.bulan).length; return Math.max(0, Math.min(S.minggu, n - 1)); }
   function bk() { return mingguBulan(S.tahun, S.bulan)[idxMinggu()]; }  /* kunci pekan terpilih */
   function lunasDi(b, id) { return !!(D.bayar[b] && D.bayar[b][id]); }
@@ -250,11 +256,11 @@ var KONFIG = {
   function barisHTML(w, i) {
     var b = bk(), l = lunasDi(b, w.id), t = l ? D.bayar[b][w.id] : '';
     return '<li class="baris muncul' + (l ? ' lunas' : '') + '" style="--i:' + Math.min(i, 14) + '" data-id="' + w.id + '">' +
-      '<button class="ketuk" type="button" aria-pressed="' + l + '" aria-label="' + esc(w.nama) + ', ' + (l ? 'lunas. Ketuk untuk batalkan' : 'belum bayar. Ketuk untuk tandai lunas') + '">' +
+      '<button class="ketuk" type="button"' + (ADMIN ? '' : ' disabled') + ' aria-pressed="' + l + '" aria-label="' + esc(w.nama) + ', ' + (l ? 'lunas' + (ADMIN ? '. Ketuk untuk batalkan' : '') : 'belum bayar' + (ADMIN ? '. Ketuk untuk tandai lunas' : '')) + '">' +
       '<span class="avatar" aria-hidden="true">' + esc(inisial(w.nama)) + IK.cek + '</span>' +
       '<span class="info"><span class="nama">' + esc(w.nama) + '</span><span class="ket">' + (l ? 'Bayar ' + tglPendek(t) : rp(D.pengaturan.iuran)) + '</span></span>' +
       '<span class="status">' + (l ? 'Lunas' : 'Belum') + '</span></button>' +
-      (l ? buktiBtn(b, w) : '<button class="wa-btn" type="button" data-wa="' + w.id + '" aria-label="Pesan pengingat untuk ' + esc(w.nama) + '">' + IK.wa + '</button>') + '</li>';
+      (!ADMIN || l ? '' : '<button class="wa-btn" type="button" data-wa="' + w.id + '" aria-label="Pesan pengingat untuk ' + esc(w.nama) + '">' + IK.wa + '</button>') + '</li>';
   }
   function buktiBtn(b, w) {
     var f = D.bukti[b] && D.bukti[b][w.id];
@@ -264,8 +270,9 @@ var KONFIG = {
     var b = bk(), r = rekap(b), list = wargaTersaring();
     $('#nSemua').textContent = r.total; $('#nBelum').textContent = r.belum.length; $('#nLunas').textContent = r.lunas.length;
     $('#judulDaftar').textContent = 'Iuran Minggu ' + (idxMinggu() + 1);
-    $('#subDaftar').textContent = rentang(b) + ' ' + akhirMinggu(b).split('-')[0] + ' · ' + rp(D.pengaturan.iuran) + '/anggota per minggu' + (batasTeks() ? ' · batas ' + batasTeks() : '') + ' · ketuk nama untuk lunas';
+    $('#subDaftar').textContent = rentang(b) + ' ' + akhirMinggu(b).split('-')[0] + ' · ' + rp(D.pengaturan.iuran) + '/anggota per minggu' + (batasTeks() ? ' · batas ' + batasTeks() : '') + (ADMIN ? ' · ketuk nama untuk lunas' : '');
     var ul = $('#listWarga');
+    if (S.memuat) { ul.innerHTML = '<li class="kosong"><b>Memuat data…</b></li>'; return; }
     if (!D.warga.length) { ul.innerHTML = '<li class="kosong">' + IK.kosong + '<b>Belum ada anggota</b>Klik tombol "+ Anggota" untuk menambah anggota pertama.</li>'; return; }
     if (!list.length) {
       var semua = S.saring === 'belum' && !S.cari;
@@ -316,7 +323,7 @@ var KONFIG = {
     var tr = D.kas.filter(function (x) { return x.tgl >= b && x.tgl <= akhirMinggu(b); }).sort(function (x, y) { return x.tgl < y.tgl ? 1 : -1; });
     $('#listKas').innerHTML = tr.length ? tr.map(function (x, i) {
       return '<li class="' + x.jenis + ' muncul" style="--i:' + Math.min(i, 12) + '"><span class="t-ikon">' + (x.jenis === 'masuk' ? IK.naik : IK.turun) + '</span><span class="t-isi"><b>' + esc(x.ket) + '</b><small>' + tglPendek(x.tgl) + (x.ref ? ' · otomatis dari iuran' : '') + '</small></span><span class="jml">' + (x.jenis === 'masuk' ? '+' : '−') + rp(x.jumlah) + '</span>' +
-        (x.ref ? '' : '<button class="hapus-t" type="button" data-hapus-kas="' + x.id + '" aria-label="Hapus transaksi ' + esc(x.ket) + '">' + IK.hapus + '</button>') + '</li>';
+        (x.ref || !ADMIN ? '' : '<button class="hapus-t" type="button" data-hapus-kas="' + x.id + '" aria-label="Hapus transaksi ' + esc(x.ket) + '">' + IK.hapus + '</button>') + '</li>';
     }).join('') : '<li class="kosong">' + IK.kosong + '<b>Belum ada transaksi</b>Catat pemasukan atau pengeluaran di atas.</li>';
     var L = pesanLaporan();
     $('#lapRingkas').innerHTML = '<div><small>Saldo awal</small><b>' + rp(L.awal) + '</b></div><div><small>Masuk</small><b>' + rp(L.kb.masuk) + '</b></div><div><small>Keluar</small><b>' + rp(L.kb.keluar) + '</b></div><div class="sorot-akhir"><small>Saldo akhir</small><b>' + rp(L.akhir) + '</b></div>';
@@ -372,6 +379,7 @@ var KONFIG = {
   pasangLogo();
   // Ketuk baris = lunas / batal, dengan Urungkan.
   $('#listWarga').addEventListener('click', function (e) {
+    if (!ADMIN) return;
     var wa = e.target.closest('[data-wa]');
     if (wa) { bukaPengingat(cariWarga(wa.getAttribute('data-wa'))); return; }
     var bt = e.target.closest('[data-bukti]');
@@ -423,7 +431,7 @@ var KONFIG = {
   function angka(v) { return Number(String(v).replace(/\D/g, '')) || 0; }
   $('#formKas').jumlah.addEventListener('input', function () { var n = angka(this.value); this.value = n ? ribu(n) : ''; });
   $('#formKas').addEventListener('submit', function (e) {
-    e.preventDefault(); var f = this, g = $('#galatKas'), n = angka(f.jumlah.value), ket = f.ket.value.trim();
+    e.preventDefault(); if (!ADMIN) return; var f = this, g = $('#galatKas'), n = angka(f.jumlah.value), ket = f.ket.value.trim();
     [f.ket, f.jumlah, f.tgl].forEach(function (x) { x.removeAttribute('aria-invalid'); });
     var salah = !ket ? f.ket : !n ? f.jumlah : !f.tgl.value ? f.tgl : null;
     if (salah) { salah.setAttribute('aria-invalid', 'true'); g.textContent = !ket ? 'Isi keterangan transaksi.' : !n ? 'Jumlah harus lebih dari 0.' : 'Pilih tanggal.'; salah.focus(); return; }
@@ -435,7 +443,7 @@ var KONFIG = {
     render(); toast((x.jenis === 'masuk' ? 'Pemasukan ' : 'Pengeluaran ') + rp(n) + ' dicatat');
   });
   $('#listKas').addEventListener('click', function (e) {
-    var h = e.target.closest('[data-hapus-kas]'); if (!h) return;
+    var h = e.target.closest('[data-hapus-kas]'); if (!h || !ADMIN) return;
     var id = h.getAttribute('data-hapus-kas'), idx = -1, x;
     D.kas.forEach(function (k, i) { if (k.id === id) { idx = i; x = k; } });
     if (!x) return; D.kas.splice(idx, 1); simpan(); render();
@@ -497,7 +505,7 @@ var KONFIG = {
           f.nama.removeAttribute('aria-invalid');
           var salah = !nama ? f.nama : null;
           if (salah) { salah.setAttribute('aria-invalid', 'true'); $('#gW', r).textContent = 'Nama anggota wajib diisi.'; salah.focus(); return; }
-          if (baru) { w = { id: idBaru('w') }; D.warga.push(w); }
+          if (baru) { w = { id: idBaru('w') }; D.warga.push(w); } else { w = cariWarga(w.id) || w; }
           w.nama = nama; w.hp = f.hp.value.trim();
           simpan(); tutupModal(); render(); toast(baru ? nama + ' ditambahkan' : 'Data ' + nama + ' disimpan');
         });
@@ -508,8 +516,9 @@ var KONFIG = {
         };
       });
   }
-  $('#btnTambahWarga').onclick = function () { formWarga(); };
+  $('#btnTambahWarga').onclick = function () { if (ADMIN) formWarga(); };
   $('#btnAtur').onclick = function () {
+    if (!ADMIN) return;
     var p = D.pengaturan;
     bukaModal('Pengaturan & data',
       '<form id="fA" novalidate class="form-kas">' +
@@ -552,7 +561,7 @@ var KONFIG = {
     toast('CSV diunduh: iuran ' + namaPeriode(b) + ' + semua kas');
   };
   $('#eksJson').onclick = function () { unduh('backup-iuran-kas-' + hariIni() + '.json', JSON.stringify(D, null, 2), 'application/json'); toast('Backup JSON diunduh'); };
-  $('#impJson').onclick = function () { $('#berkasJson').click(); };
+  $('#impJson').onclick = function () { if (ADMIN) $('#berkasJson').click(); };
   $('#berkasJson').onchange = function () {
     var f = this.files[0]; if (!f) return; var self = this;
     f.text().then(function (t) {
@@ -563,11 +572,50 @@ var KONFIG = {
     }).catch(function () { toast('Berkas bukan backup Iuran & Kas MPN yang valid'); }).then(function () { self.value = ''; });
   };
 
+  /* Masuk / keluar pengurus */
+  function labelMasuk() { var b = $('#btnMasuk'); if (b) b.textContent = emailMasuk ? 'Keluar (' + emailMasuk + ')' : 'Masuk pengurus'; }
+  function bukaLogin() {
+    bukaModal('Masuk pengurus',
+      '<form id="fM" novalidate class="form-kas">' +
+      '<label class="field"><span>Email</span><input name="email" type="email" inputmode="email" autocomplete="username" required></label>' +
+      '<label class="field"><span>Kata sandi</span><input name="sandi" type="password" autocomplete="current-password" required></label>' +
+      '<p class="galat" id="gM" role="alert"></p><button class="btn lebar" type="submit">Masuk</button></form>' +
+      '<p class="sub">Hanya untuk pengurus. Anggota cukup melihat tanpa masuk.</p>',
+      function (r) {
+        $('#fM', r).addEventListener('submit', function (e) {
+          e.preventDefault(); var f = this, em = f.email.value.trim(), pw = f.sandi.value, g = $('#gM', r);
+          if (!em || !pw) { g.textContent = 'Isi email dan kata sandi.'; return; }
+          g.textContent = 'Memeriksa…';
+          BACKEND.masuk(em, pw).then(function () { tutupModal(); toast('Berhasil masuk'); }).catch(function (err) { g.textContent = pesanGalat(err); });
+        });
+      });
+  }
+  $('#btnMasuk').onclick = function () {
+    if (emailMasuk) { BACKEND.keluar().then(function () { toast('Anda sudah keluar'); }); } else bukaLogin();
+  };
+  function pasangBackend() {
+    if (!window.BACKEND) { S.memuat = false; render(); toast('Layanan online tidak tersedia.'); return; }
+    BACKEND.pasang({
+      saatData: function (d) { D = d; migrasi(D); S.memuat = false; render(); },
+      saatPeran: function (peran, email) {
+        var adminBaru = peran === 'admin', beda = adminBaru !== ADMIN;
+        ADMIN = adminBaru; emailMasuk = email || '';
+        document.documentElement.setAttribute('data-peran', ADMIN ? 'admin' : 'anggota');
+        labelMasuk();
+        if (beda) pilihTab(ADMIN ? 'ingat' : 'kas');
+        render();
+        if (email && !ADMIN && !S.peringatanAkun) { S.peringatanAkun = 1; setTimeout(function () { if (!ADMIN && emailMasuk) toast('Akun ini bukan pengurus, jadi hanya bisa melihat.'); }, 1500); }
+      },
+      saatGalat: function (m) { S.memuat = false; render(); toast(m); }
+    });
+  }
+
   /* Mulai */
   muat();
-  try { if (!localStorage.getItem(KUNCI)) simpan(); } catch (e) {}
   if (window.TEMA && TEMA.nama) $$('[data-tema-nama]').forEach(function (el) { el.textContent = TEMA.nama; });
   hitungKontras();
+  document.documentElement.setAttribute('data-peran', 'anggota');
   render();
-  pilihTab('ingat');
+  pilihTab('kas');
+  pasangBackend();
 })();
