@@ -1,7 +1,7 @@
 /* Layanan offline sederhana. File aplikasi: jaringan dulu (selalu dapat versi terbaru), salinan tersimpan dipakai bila offline.
    Skrip Firebase dari gstatic: salinan tersimpan dulu (alamatnya berversi). Permintaan data Firestore tidak disentuh. */
 var NAMA = 'kas-mpn-v1';
-var INTI = ['./', 'index.html', 'style.css', 'tema.css', 'tema.js', 'app.js', 'data.js', 'sinkron.js', 'backend.js', 'firebase-config.js', 'logo-mpn.png', 'icon-192.png', 'icon-512.png', 'manifest.webmanifest', 'ikon.svg'];
+var INTI = ['./', 'index.html', 'style.css', 'tema.css', 'tema.js', 'app.js', 'data.js', 'sinkron.js', 'backend.js', 'firebase-config.js', 'logo-mpn.png', 'icon-192.png', 'icon-512.png', 'manifest.json', 'ikon.svg'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(NAMA).then(function (c) { return Promise.all(INTI.map(function (u) { return c.add(new Request(u, { cache: 'reload' })).catch(function () {}); })); }).then(function () { return self.skipWaiting(); }));
 });
