@@ -43,6 +43,17 @@
     },
     masuk: function (email, sandi) { if (!siap) return Promise.reject({ code: 'belum-siap' }); return fb.auth.signInWithEmailAndPassword(auth, email, sandi); },
     keluar: function () { return siap ? fb.auth.signOut(auth) : Promise.resolve(); },
+    catat: function (teks) {
+      if (!siap || !admin || !user) return Promise.reject({ code: 'permission-denied' });
+      return fb.fs.addDoc(fb.fs.collection(db, 'riwayat'), { waktu: fb.fs.serverTimestamp(), oleh: user.email || '', aksi: String(teks).slice(0, 300) });
+    },
+    riwayat: function (n) {
+      if (!siap || !admin) return Promise.reject({ code: 'permission-denied' });
+      var q = fb.fs.query(fb.fs.collection(db, 'riwayat'), fb.fs.orderBy('waktu', 'desc'), fb.fs.limit(n || 100));
+      return fb.fs.getDocs(q).then(function (s) {
+        return s.docs.map(function (d) { var x = d.data(); return { waktu: x.waktu && x.waktu.toDate ? x.waktu.toDate().toISOString() : '', oleh: x.oleh || '', aksi: x.aksi || '' }; });
+      });
+    },
     tulis: function (D) {
       if (!siap || !admin) return Promise.reject({ code: 'permission-denied' });
       var n = SINKRON.keN(D), pubBaru = SINKRON.ratakan(n.pub), hpBaru = SINKRON.ratakanHp(n.hp), jj = [];

@@ -19,6 +19,8 @@
 <meta name="description" content="Catat iuran bulanan, saldo kas, pengingat WhatsApp, dan laporan kas dalam satu layar.">
 <meta name="theme-color" content="#10291c">
 <link rel="icon" href="ikon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link id="fontTema" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700;9..40,800&display=swap">
@@ -83,6 +85,7 @@
           <button class="chip" type="button" data-saring="semua" aria-pressed="true">Semua <i id="nSemua">0</i></button>
           <button class="chip" type="button" data-saring="belum" aria-pressed="false">Belum <i id="nBelum">0</i></button>
           <button class="chip" type="button" data-saring="lunas" aria-pressed="false">Lunas <i id="nLunas">0</i></button>
+          <button class="chip" type="button" data-saring="nonaktif" aria-pressed="false" hidden>Nonaktif <i id="nNonaktif">0</i></button>
         </div>
       </div>
       <ul class="daftar" id="listWarga" aria-live="polite"></ul>
@@ -127,6 +130,11 @@
       <div class="panel-tab" role="tabpanel" id="pn-lap" aria-labelledby="tab-lap" hidden>
         <div class="lap-kop"><img class="logo-rt" alt="Logo MPN" data-logo><h3>Laporan mingguan</h3></div>
         <p class="sub">Siap dibagikan ke grup atau dicetak.</p>
+        <div class="chip-grup lap-mode" role="group" aria-label="Jenis laporan">
+          <button class="chip" type="button" data-lap="minggu" aria-pressed="true">Mingguan</button>
+          <button class="chip" type="button" data-lap="bulan" aria-pressed="false">Bulanan</button>
+          <button class="chip" type="button" data-lap="tahun" aria-pressed="false">Tahunan</button>
+        </div>
         <div class="lap-ringkas" id="lapRingkas"></div>
         <pre class="pesan" id="pesanLap" tabindex="0"></pre>
         <div class="baris-aksi">
@@ -140,11 +148,12 @@
         <button class="tautan" type="button" id="eksCsv"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4-4 4 4 4-4M5 20h14"/></svg>Ekspor CSV</button>
         <button class="tautan" type="button" id="eksJson"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m-4-4 4 4 4-4M5 20h14"/></svg>Backup JSON</button>
         <button class="tautan" type="button" id="impJson"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20V9m-4 4 4-4 4 4M5 4h14"/></svg>Pulihkan</button>
+        <button class="tautan" type="button" id="btnRiwayat"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Riwayat</button>
         <input type="file" id="berkasJson" accept="application/json,.json" hidden>
       </div>
     </aside>
   </div>
-  <p class="kaki">Data tersimpan online dan hanya bisa diubah oleh pengurus. · <button class="tautan-kecil" id="btnMasuk" type="button">Masuk pengurus</button> · Dibuat oleh Maliki Studio</p>
+  <p class="kaki">Data tersimpan online dan hanya bisa diubah oleh pengurus. · <button class="tautan-kecil" id="btnMasuk" type="button">Masuk pengurus</button><span id="wadahPasang" hidden> · <button class="tautan-kecil" id="btnPasang" type="button">Pasang aplikasi</button></span> · Disesuaikan untuk MPN oleh Latif · <span class="kredit-maliki">Template oleh <a href="https://malikisaputra.biz.id" target="_blank" rel="noopener">@malikisaputra</a></span></p>
 </main>
 
 <div class="latar-modal" id="modal" hidden>
@@ -160,6 +169,15 @@
 <script src="backend.js"></script>
 <script src="data.js"></script>
 <script src="app.js"></script>
-  <p class="kredit-maliki" style="margin:24px auto 112px;padding:0 16px;text-align:center;font:12px/1.5 system-ui,sans-serif;opacity:.7">Template oleh <a href="https://malikisaputra.biz.id" target="_blank" rel="noopener" style="color:inherit">@malikisaputra</a></p>
+<script>
+/* Aplikasi bisa dipasang di layar utama: layanan offline (sw.js) + tombol "Pasang aplikasi" saat peramban mendukung. */
+(function () {
+  if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+  var tunda = null;
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); tunda = e; document.getElementById('wadahPasang').hidden = false; });
+  document.getElementById('btnPasang').onclick = function () { if (!tunda) return; tunda.prompt(); tunda = null; document.getElementById('wadahPasang').hidden = true; };
+  window.addEventListener('appinstalled', function () { document.getElementById('wadahPasang').hidden = true; });
+})();
+</script>
 </body>
 </html>

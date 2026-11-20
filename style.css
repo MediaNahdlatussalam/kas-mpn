@@ -45,7 +45,7 @@ h2 { font-size: 1.12rem; } h3 { font-size: .98rem; }
 /* Kepala + pahlawan: satu blok hijau tua */
 .atas { background: var(--nav); color: var(--nav-teks); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px max(16px, calc((100vw - 1200px) / 2)); padding-top: max(14px, env(safe-area-inset-top)); }
 .merek { display: flex; align-items: center; gap: 12px; min-width: 0; }
-.merek-logo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--aksen); color: #10291c; }
+.merek-logo { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: transparent; color: #10291c; flex: none; }
 .merek-teks { display: flex; flex-direction: column; min-width: 0; }
 .merek-teks b { font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .merek-teks small { color: var(--nav-redup); font-size: .8rem; }
@@ -251,10 +251,11 @@ html.mode-pilih [data-pilih-hover] { outline: 2px solid var(--tema-aksen) !impor
 /* Cetak laporan */
 /* Slot logo & foto bukti (KONFIG di app.js) */
 .merek-logo { overflow: hidden; }
-.logo-rt { width: 100%; height: 100%; object-fit: cover; display: block; }
+.logo-rt { width: 100%; height: 100%; object-fit: contain; display: block; }
+.merek-logo .logo-inisial { width: 100%; height: 100%; display: grid; place-items: center; border-radius: 50%; background: var(--aksen); }
 .logo-inisial { font-weight: 800; font-size: 15px; }
 .lap-kop { display: flex; align-items: center; gap: 10px; }
-.lap-kop .logo-rt, .lap-kop .logo-inisial { width: 36px; height: 36px; border-radius: 10px; flex: none; }
+.lap-kop .logo-rt, .lap-kop .logo-inisial { width: 40px; height: 40px; border-radius: 50%; flex: none; }
 .lap-kop .logo-inisial { display: grid; place-items: center; background: var(--aksen); color: #10291c; }
 .lap-kop h3 { margin: 0; }
 .bukti-btn { overflow: hidden; padding: 0; color: inherit; }
@@ -298,3 +299,23 @@ html:not([data-peran="admin"]) #formKas,
 html:not([data-peran="admin"]) .data-aksi { display: none; }
 .ketuk:disabled { opacity: 1; cursor: default; color: inherit; }
 .tautan-kecil { background: none; border: 0; padding: 12px 4px; margin: -12px 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+
+.kaki a { color: inherit; text-decoration: underline; }
+
+/* Fitur tambahan: menu anggota, bayar beberapa minggu, riwayat, pilihan jenis laporan */
+.chip[hidden] { display: none; }
+.lap-mode { width: 100%; margin: 14px 0 4px; }
+.lap-mode .chip { flex: 1; justify-content: center; }
+.menu-aksi { display: grid; gap: 10px; margin-bottom: 14px; }
+.menu-aksi .btn { justify-content: flex-start; }
+.ringkas-minggu { list-style: none; margin: 12px 0 14px; padding: 0; max-height: 38vh; overflow: auto; border: 1px solid var(--garis); border-radius: var(--r-kecil); }
+.ringkas-minggu li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border-top: 1px solid var(--garis); font-size: .9rem; }
+.ringkas-minggu li:first-child { border-top: 0; }
+.ringkas-minggu .lewat { color: var(--redup); }
+.ringkas-minggu .total { font-weight: 700; background: var(--lembut); }
+.riwayat { list-style: none; margin: 12px 0 0; padding: 0; max-height: 55vh; overflow: auto; }
+.riwayat li { display: grid; gap: 2px; padding: 10px 0; border-top: 1px solid var(--garis); font-size: .92rem; }
+.riwayat li:first-child { border-top: 0; }
+.riwayat small { color: var(--redup); font-size: .78rem; }
+.baris.nonaktif .nama { color: var(--redup); }
+html:not([data-peran="admin"]) .data-aksi, html:not([data-peran="admin"]) .chip[data-saring="nonaktif"] { display: none; }

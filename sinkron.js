@@ -6,7 +6,7 @@
   function klon(x) { return JSON.parse(JSON.stringify(x)); }
   function keN(D) {
     var pub = { pengaturan: klon(D.pengaturan || {}), warga: {}, bayar: {}, kas: {} }, hp = {};
-    (D.warga || []).forEach(function (w) { pub.warga[w.id] = { id: w.id, nama: w.nama }; if (w.hp) hp[w.id] = w.hp; });
+    (D.warga || []).forEach(function (w) { pub.warga[w.id] = { id: w.id, nama: w.nama }; if (w.nonaktif) pub.warga[w.id].nonaktif = true; if (w.hp) hp[w.id] = w.hp; });
     Object.keys(D.bayar || {}).forEach(function (k) {
       var m = D.bayar[k] || {}, ids = Object.keys(m);
       if (ids.length) { pub.bayar[k] = {}; ids.forEach(function (id) { pub.bayar[k][id] = m[id]; }); }
@@ -24,7 +24,7 @@
     kas.sort(function (a, b) { return a.tgl < b.tgl ? -1 : a.tgl > b.tgl ? 1 : (a.id < b.id ? -1 : 1); });
     return {
       versi: 1, pengaturan: klon(pub.pengaturan || {}),
-      warga: Object.keys(pub.warga || {}).map(function (id) { return { id: id, nama: pub.warga[id].nama, hp: hp[id] || '' }; }),
+      warga: Object.keys(pub.warga || {}).map(function (id) { var o = { id: id, nama: pub.warga[id].nama, hp: hp[id] || '' }; if (pub.warga[id].nonaktif) o.nonaktif = true; return o; }),
       bayar: klon(pub.bayar || {}), bukti: {}, kas: kas
     };
   }

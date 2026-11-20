@@ -3,7 +3,7 @@
    Peta: 1. util · 2. data & simpan · 3. tema/customizer · 4. render · 5. aksi · 6. ekspor */
 /* KONFIG gambar: ganti logo cukup timpa img/logo-rt.svg (atau ubah path ke .png/.jpg). */
 var KONFIG = {
-  logo: 'img/logo-rt.svg',             // logo RT: header + laporan cetak
+  logo: 'logo-mpn.png',                // logo MPN: header + laporan cetak
   contohBukti: 'img/contoh-bukti.svg', // contoh rasio foto bukti bayar (3:4)
   maksFoto: 400                        // sisi terpanjang foto bukti (px) sebelum disimpan
 };
@@ -44,6 +44,8 @@ var KONFIG = {
     hapus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>',
     ubah: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>',
     foto: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="18" height="13" rx="2"/><circle cx="12" cy="13.5" r="3.5"/><path d="M8 7l1.5-3h5L16 7"/></svg>',
+    menu: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
+    kalender: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>',
     kosong: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 3 3 5-6"/></svg>'
   };
 
@@ -83,20 +85,24 @@ var KONFIG = {
     });
   }
   function simpan() { if (!ADMIN || !window.BACKEND) return; BACKEND.tulis(D).catch(function (e) { toast('Gagal menyimpan: ' + pesanGalat(e)); }); }
+  function catat(teks) { if (ADMIN && window.BACKEND && BACKEND.catat) BACKEND.catat(teks).catch(function () {}); }  /* riwayat perubahan */
   var kini = new Date();
   function awalIdx(y, m) { var t = hariIni(), idx = 0; mingguBulan(y, m).forEach(function (k, i) { if (k <= t) idx = i; }); return idx; }
-  var S = { tahun: kini.getFullYear(), bulan: kini.getMonth(), minggu: awalIdx(kini.getFullYear(), kini.getMonth()), saring: 'semua', cari: '', tab: 'ingat', memuat: true };
+  var S = { tahun: kini.getFullYear(), bulan: kini.getMonth(), minggu: awalIdx(kini.getFullYear(), kini.getMonth()), saring: 'semua', cari: '', tab: 'ingat', memuat: true, lap: 'minggu' };
   function idxMinggu() { var n = mingguBulan(S.tahun, S.bulan).length; return Math.max(0, Math.min(S.minggu, n - 1)); }
   function bk() { return mingguBulan(S.tahun, S.bulan)[idxMinggu()]; }  /* kunci pekan terpilih */
   function lunasDi(b, id) { return !!(D.bayar[b] && D.bayar[b][id]); }
   function saldo(sampaiTgl) { return D.kas.reduce(function (s, x) { return (!sampaiTgl || x.tgl <= sampaiTgl) ? s + (x.jenis === 'masuk' ? 1 : -1) * x.jumlah : s; }, 0); }
   function kasBulan(b) { var m = 0, k = 0, iu = 0; D.kas.forEach(function (x) { if (x.tgl >= b && x.tgl <= akhirMinggu(b)) { if (x.jenis === 'masuk') { m += x.jumlah; if (x.ref) iu += x.jumlah; } else k += x.jumlah; } }); return { masuk: m, keluar: k, iuran: iu }; }
+  /* Anggota nonaktif hanya ikut dihitung di pekan tempat ia punya catatan lunas. */
+  function anggotaPekan(b) { return D.warga.filter(function (w) { return !w.nonaktif || lunasDi(b, w.id); }); }
   function rekap(b) {
-    var lunas = D.warga.filter(function (w) { return lunasDi(b, w.id); });
-    var belum = D.warga.filter(function (w) { return !lunasDi(b, w.id); });
-    return { lunas: lunas, belum: belum, total: D.warga.length, kurang: belum.length * D.pengaturan.iuran, terkumpul: kasBulan(b).iuran };
+    var semua = anggotaPekan(b);
+    var lunas = semua.filter(function (w) { return lunasDi(b, w.id); });
+    var belum = semua.filter(function (w) { return !lunasDi(b, w.id); });
+    return { lunas: lunas, belum: belum, total: semua.length, kurang: belum.length * D.pengaturan.iuran, terkumpul: kasBulan(b).iuran };
   }
-  function setLunas(w, b, lunas, tgl) {
+  function setLunas(w, b, lunas, tgl, jeda) {
     var ref = b + ':' + w.id;
     D.kas = D.kas.filter(function (x) { return x.ref !== ref; });
     D.bayar[b] = D.bayar[b] || {};
@@ -105,7 +111,7 @@ var KONFIG = {
       D.bayar[b][w.id] = t;
       D.kas.push({ id: idBaru('k'), tgl: t, jenis: 'masuk', ket: 'Iuran ' + w.nama, jumlah: Number(D.pengaturan.iuran) || 0, ref: ref });
     } else delete D.bayar[b][w.id];
-    simpan();
+    if (!jeda) simpan();
   }
 
   /* ========== 3. Tema (kontrak customizer Maliki Studio) ========== */
@@ -221,7 +227,7 @@ var KONFIG = {
     $('#stKurang').textContent = rp(r.kurang);
     $('#stKeluar').textContent = rp(kb.keluar);
   }
-  function statusMinggu(k) { var n = D.bayar[k] ? Object.keys(D.bayar[k]).length : 0; return { ada: n > 0, penuh: n > 0 && D.warga.length > 0 && D.warga.every(function (w) { return lunasDi(k, w.id); }) }; }
+  function statusMinggu(k) { var n = D.bayar[k] ? Object.keys(D.bayar[k]).length : 0, a = anggotaPekan(k); return { ada: n > 0, penuh: n > 0 && a.length > 0 && a.every(function (w) { return lunasDi(k, w.id); }) }; }
   function statusBulan(y, m) { var ada = false, penuh = true, t = hariIni(); mingguBulan(y, m).forEach(function (k) { var st = statusMinggu(k); if (st.ada) ada = true; if (k <= t && !st.penuh) penuh = false; }); return { ada: ada, penuh: ada && penuh }; }
   function renderMinggu() {
     var ws = mingguBulan(S.tahun, S.bulan), ai = idxMinggu(), html = '';
@@ -245,30 +251,36 @@ var KONFIG = {
     if (a) wadah.scrollLeft = a.offsetLeft - wadah.clientWidth / 2 + a.clientWidth / 2;
   }
   function wargaTersaring() {
-    var b = bk(), q = S.cari.toLowerCase();
-    return D.warga.filter(function (w) {
+    var b = bk(), q = S.cari.toLowerCase(), nv = S.saring === 'nonaktif';
+    return (nv ? D.warga.filter(function (w) { return w.nonaktif; }) : anggotaPekan(b)).filter(function (w) {
       var l = lunasDi(b, w.id);
-      if (S.saring === 'lunas' && !l) return false;
-      if (S.saring === 'belum' && l) return false;
+      if (!nv && S.saring === 'lunas' && !l) return false;
+      if (!nv && S.saring === 'belum' && l) return false;
       return !q || w.nama.toLowerCase().indexOf(q) >= 0;
     }).sort(urutNama);
   }
   function barisHTML(w, i) {
-    var b = bk(), l = lunasDi(b, w.id), t = l ? D.bayar[b][w.id] : '';
-    return '<li class="baris muncul' + (l ? ' lunas' : '') + '" style="--i:' + Math.min(i, 14) + '" data-id="' + w.id + '">' +
-      '<button class="ketuk" type="button"' + (ADMIN ? '' : ' disabled') + ' aria-pressed="' + l + '" aria-label="' + esc(w.nama) + ', ' + (l ? 'lunas' + (ADMIN ? '. Ketuk untuk batalkan' : '') : 'belum bayar' + (ADMIN ? '. Ketuk untuk tandai lunas' : '')) + '">' +
+    var b = bk(), l = lunasDi(b, w.id), t = l ? D.bayar[b][w.id] : '', nv = !!w.nonaktif && S.saring === 'nonaktif', bisa = ADMIN && !nv;
+    var ket = nv ? 'Nonaktif' : (l ? 'Bayar ' + tglPendek(t) : rp(D.pengaturan.iuran)) + (w.nonaktif ? ' · nonaktif' : '');
+    return '<li class="baris muncul' + (l && !nv ? ' lunas' : '') + (nv ? ' nonaktif' : '') + '" style="--i:' + Math.min(i, 14) + '" data-id="' + w.id + '">' +
+      '<button class="ketuk" type="button"' + (bisa ? '' : ' disabled') + ' aria-pressed="' + (l && !nv) + '" aria-label="' + esc(w.nama) + ', ' + (nv ? 'nonaktif' : l ? 'lunas' + (bisa ? '. Ketuk untuk batalkan' : '') : 'belum bayar' + (bisa ? '. Ketuk untuk tandai lunas' : '')) + '">' +
       '<span class="avatar" aria-hidden="true">' + esc(inisial(w.nama)) + IK.cek + '</span>' +
-      '<span class="info"><span class="nama">' + esc(w.nama) + '</span><span class="ket">' + (l ? 'Bayar ' + tglPendek(t) : rp(D.pengaturan.iuran)) + '</span></span>' +
-      '<span class="status">' + (l ? 'Lunas' : 'Belum') + '</span></button>' +
-      (!ADMIN || l ? '' : '<button class="wa-btn" type="button" data-wa="' + w.id + '" aria-label="Pesan pengingat untuk ' + esc(w.nama) + '">' + IK.wa + '</button>') + '</li>';
+      '<span class="info"><span class="nama">' + esc(w.nama) + '</span><span class="ket">' + ket + '</span></span>' +
+      '<span class="status">' + (nv ? 'Nonaktif' : l ? 'Lunas' : 'Belum') + '</span></button>' +
+      (ADMIN && !l && !w.nonaktif ? '<button class="wa-btn" type="button" data-wa="' + w.id + '" aria-label="Pesan pengingat untuk ' + esc(w.nama) + '">' + IK.wa + '</button>' : '') +
+      (ADMIN ? '<button class="wa-btn menu-btn" type="button" data-menu="' + w.id + '" aria-label="Menu untuk ' + esc(w.nama) + '">' + IK.menu + '</button>' : '') + '</li>';
   }
   function buktiBtn(b, w) {
     var f = D.bukti[b] && D.bukti[b][w.id];
     return '<button class="wa-btn bukti-btn" type="button" data-bukti="' + w.id + '" aria-label="' + (f ? 'Lihat' : 'Tambah') + ' foto bukti bayar ' + esc(w.nama) + '">' + (f ? '<img src="' + f + '" alt="">' : IK.foto) + '</button>';
   }
   function renderDaftar() {
+    var nn = D.warga.filter(function (w) { return w.nonaktif; }).length;
+    if (S.saring === 'nonaktif' && !(ADMIN && nn)) S.saring = 'semua';
     var b = bk(), r = rekap(b), list = wargaTersaring();
-    $('#nSemua').textContent = r.total; $('#nBelum').textContent = r.belum.length; $('#nLunas').textContent = r.lunas.length;
+    $('#nSemua').textContent = r.total; $('#nBelum').textContent = r.belum.length; $('#nLunas').textContent = r.lunas.length; $('#nNonaktif').textContent = nn;
+    $('[data-saring="nonaktif"]').hidden = !(ADMIN && nn);
+    $$('.chip[data-saring]').forEach(function (x) { x.setAttribute('aria-pressed', String(x.dataset.saring === S.saring)); });
     $('#judulDaftar').textContent = 'Iuran Minggu ' + (idxMinggu() + 1);
     $('#subDaftar').textContent = rentang(b) + ' ' + akhirMinggu(b).split('-')[0] + ' · ' + rp(D.pengaturan.iuran) + '/anggota per minggu' + (batasTeks() ? ' · batas ' + batasTeks() : '') + (ADMIN ? ' · ketuk nama untuk lunas' : '');
     var ul = $('#listWarga');
@@ -301,7 +313,7 @@ var KONFIG = {
     } else t += '\nAlhamdulillah, semua anggota sudah lunas. Terima kasih!';
     return t + '\n\nTerima kasih,\n' + p.bendahara;
   }
-  function pesanLaporan() {
+  function pesanLaporanMinggu() {
     var b = bk(), r = rekap(b), kb = kasBulan(b);
     var awal = saldo(tambahHari(b, -1)), akhir = awal + kb.masuk - kb.keluar;
     var tr = D.kas.filter(function (x) { return x.tgl >= b && x.tgl <= akhirMinggu(b); }).sort(function (x, y) { return x.tgl < y.tgl ? -1 : 1; });
@@ -315,6 +327,34 @@ var KONFIG = {
     if (r.belum.length) t += '\n\nBelum bayar: ' + r.belum.slice().sort(urutNama).map(function (w) { return w.nama; }).join(', ');
     return { teks: t + '\n\n' + D.pengaturan.bendahara, awal: awal, akhir: akhir, kb: kb };
   }
+  function pesanLaporan() {
+    var mode = S.lap || 'minggu', b = bk();
+    if (mode === 'minggu') { var L0 = pesanLaporanMinggu(); L0.judul = namaPeriode(b); L0.mode = mode; return L0; }
+    var tahun = mode === 'tahun', dari = tahun ? S.tahun + '-01-01' : kunciBulan(S.tahun, S.bulan) + '-01';
+    var sampai = tahun ? S.tahun + '-12-31' : isoTgl(new Date(S.tahun, S.bulan + 1, 0));
+    var judul = tahun ? 'tahun ' + S.tahun : BULAN[S.bulan].toLowerCase() + ' ' + S.tahun;
+    var tr = D.kas.filter(function (x) { return x.tgl >= dari && x.tgl <= sampai; }).sort(function (x, y) { return x.tgl < y.tgl ? -1 : x.tgl > y.tgl ? 1 : 0; });
+    var masuk = 0, keluar = 0, iuran = 0, nIuran = 0;
+    tr.forEach(function (x) { if (x.jenis === 'masuk') { masuk += x.jumlah; if (x.ref) { iuran += x.jumlah; nIuran++; } } else keluar += x.jumlah; });
+    var awal = saldo(tambahHari(dari, -1)), akhir = awal + masuk - keluar;
+    var lain = tr.filter(function (x) { return x.jenis === 'masuk' && !x.ref; }), kel = tr.filter(function (x) { return x.jenis === 'keluar'; });
+    function baris(x) { return '• ' + tglPendek(x.tgl) + ' ' + x.ket + ': ' + rp(x.jumlah); }
+    var t = '*LAPORAN KAS ' + judul.toUpperCase() + '*\n' + (window.TEMA.nama || '') + '\n\nSaldo awal: ' + rp(awal) + '\n\n*Pemasukan*\n• Iuran anggota (' + nIuran + ' pembayaran): ' + rp(iuran) + '\n' +
+      lain.map(baris).join('\n') + (lain.length ? '\n' : '') + 'Total masuk: ' + rp(masuk) + '\n';
+    if (tahun) {
+      var rows = [];
+      for (var m = 0; m < 12; m++) {
+        var d1 = kunciBulan(S.tahun, m) + '-01', d2 = isoTgl(new Date(S.tahun, m + 1, 0)), mm = 0, kk = 0, ada = false;
+        D.kas.forEach(function (x) { if (x.tgl >= d1 && x.tgl <= d2) { ada = true; if (x.jenis === 'masuk') mm += x.jumlah; else kk += x.jumlah; } });
+        if (ada) rows.push('• ' + BULAN[m] + ': masuk ' + rp(mm) + ', keluar ' + rp(kk) + ', saldo ' + rp(saldo(d2)));
+      }
+      t += '\n*Ringkasan per bulan*\n' + (rows.length ? rows.join('\n') : '• (belum ada transaksi)') + '\n';
+    } else {
+      t += '\n*Iuran per minggu*\n' + mingguBulan(S.tahun, S.bulan).map(function (k, i) { var r = rekap(k); return '• Minggu ' + (i + 1) + ' (' + rentang(k) + '): ' + r.lunas.length + '/' + r.total + ' anggota lunas'; }).join('\n') + '\n';
+    }
+    t += '\n*Pengeluaran*\n' + (kel.length ? kel.map(baris).join('\n') : '• (tidak ada)') + '\nTotal keluar: ' + rp(keluar) + '\n\n*Saldo akhir: ' + rp(akhir) + '*';
+    return { teks: t + '\n\n' + D.pengaturan.bendahara, awal: awal, akhir: akhir, kb: { masuk: masuk, keluar: keluar }, judul: judul, mode: mode };
+  }
   function renderSisi() {
     var g = pesanGrup();
     $('#pesanGrup').textContent = g;
@@ -324,8 +364,10 @@ var KONFIG = {
     $('#listKas').innerHTML = tr.length ? tr.map(function (x, i) {
       return '<li class="' + x.jenis + ' muncul" style="--i:' + Math.min(i, 12) + '"><span class="t-ikon">' + (x.jenis === 'masuk' ? IK.naik : IK.turun) + '</span><span class="t-isi"><b>' + esc(x.ket) + '</b><small>' + tglPendek(x.tgl) + (x.ref ? ' · otomatis dari iuran' : '') + '</small></span><span class="jml">' + (x.jenis === 'masuk' ? '+' : '−') + rp(x.jumlah) + '</span>' +
         (x.ref || !ADMIN ? '' : '<button class="hapus-t" type="button" data-hapus-kas="' + x.id + '" aria-label="Hapus transaksi ' + esc(x.ket) + '">' + IK.hapus + '</button>') + '</li>';
-    }).join('') : '<li class="kosong">' + IK.kosong + '<b>Belum ada transaksi</b>Catat pemasukan atau pengeluaran di atas.</li>';
+    }).join('') : '<li class="kosong">' + IK.kosong + '<b>Belum ada transaksi</b>' + (ADMIN ? 'Catat pemasukan atau pengeluaran di atas.' : 'Belum ada pemasukan atau pengeluaran di minggu ini.') + '</li>';
     var L = pesanLaporan();
+    $('.lap-kop h3').textContent = { minggu: 'Laporan mingguan', bulan: 'Laporan bulanan', tahun: 'Laporan tahunan' }[L.mode];
+    $$('[data-lap]').forEach(function (c) { c.setAttribute('aria-pressed', String(c.dataset.lap === L.mode)); });
     $('#lapRingkas').innerHTML = '<div><small>Saldo awal</small><b>' + rp(L.awal) + '</b></div><div><small>Masuk</small><b>' + rp(L.kb.masuk) + '</b></div><div><small>Keluar</small><b>' + rp(L.kb.keluar) + '</b></div><div class="sorot-akhir"><small>Saldo akhir</small><b>' + rp(L.akhir) + '</b></div>';
     $('#pesanLap').textContent = L.teks;
     var f = $('#formKas'), z = akhirMinggu(b); if (!f.tgl.value || f.tgl.value < b || f.tgl.value > z) f.tgl.value = (hariIni() >= b && hariIni() <= z) ? hariIni() : b;
@@ -380,23 +422,25 @@ var KONFIG = {
   // Ketuk baris = lunas / batal, dengan Urungkan.
   $('#listWarga').addEventListener('click', function (e) {
     if (!ADMIN) return;
+    var mn = e.target.closest('[data-menu]');
+    if (mn) { bukaMenu(cariWarga(mn.getAttribute('data-menu'))); return; }
     var wa = e.target.closest('[data-wa]');
     if (wa) { bukaPengingat(cariWarga(wa.getAttribute('data-wa'))); return; }
     var bt = e.target.closest('[data-bukti]');
     if (bt) { kelolaBukti(cariWarga(bt.getAttribute('data-bukti'))); return; }
     var k = e.target.closest('.ketuk'); if (!k) return;
     var li = k.closest('.baris'), w = cariWarga(li.dataset.id), b = bk(), l = lunasDi(b, w.id), tglLama = l ? D.bayar[b][w.id] : null;
-    setLunas(w, b, !l);
+    setLunas(w, b, !l); catat((l ? 'Membatalkan lunas: ' : 'Menandai lunas: ') + w.nama + ' (' + namaPeriode(b) + ')');
     li.classList.toggle('lunas', !l); li.classList.remove('denyut'); void li.offsetWidth; li.classList.add('denyut');
     k.setAttribute('aria-pressed', String(!l));
     setTimeout(function () { renderDaftar(); fokusBaris(w.id); }, S.saring === 'semua' && !S.cari ? 0 : 380);
     renderPahlawan(); renderBulan(); renderMinggu(); renderSisi();
-    toast(w.nama + (l ? ' dibatalkan' : ' lunas ' + rp(D.pengaturan.iuran)), { label: 'Urungkan', fn: function () { setLunas(w, b, l, tglLama); render(); fokusBaris(w.id); } });
+    toast(w.nama + (l ? ' dibatalkan' : ' lunas ' + rp(D.pengaturan.iuran)), { label: 'Urungkan', fn: function () { setLunas(w, b, l, tglLama); catat('Urungkan: ' + w.nama + ' (' + namaPeriode(b) + ')'); render(); fokusBaris(w.id); } });
   });
   function fokusBaris(id) { var el = $('.baris[data-id="' + id + '"] .ketuk'); if (el && document.activeElement && document.activeElement.closest && !document.activeElement.closest('.baris[data-id="' + id + '"]')) { if (document.activeElement === document.body || document.activeElement.closest('.daftar')) el.focus({ preventScroll: true }); } }
   function cariWarga(id) { return D.warga.filter(function (w) { return w.id === id; })[0]; }
   $('#cari').addEventListener('input', function () { S.cari = this.value.trim(); renderDaftar(); });
-  $$('.chip').forEach(function (c) { c.addEventListener('click', function () { S.saring = c.dataset.saring; $$('.chip').forEach(function (x) { x.setAttribute('aria-pressed', String(x === c)); }); renderDaftar(); tandaiBagian(); }); });
+  $$('.chip[data-saring]').forEach(function (c) { c.addEventListener('click', function () { S.saring = c.dataset.saring; $$('.chip[data-saring]').forEach(function (x) { x.setAttribute('aria-pressed', String(x === c)); }); renderDaftar(); tandaiBagian(); }); });
   $('#bulanTab').addEventListener('click', function (e) { var t = e.target.closest('.bln'); if (!t) return; S.bulan = +t.dataset.bln; S.minggu = awalIdx(S.tahun, S.bulan); render(); $('.bln[aria-selected="true"]').focus({ preventScroll: true }); });
   $('#bulanTab').addEventListener('keydown', function (e) {
     var d = { ArrowRight: 1, ArrowLeft: -1, Home: -99, End: 99 }[e.key]; if (d == null) return; e.preventDefault();
@@ -423,10 +467,11 @@ var KONFIG = {
   $('#salinLap').onclick = function () { salin(pesanLaporan().teks, 'Laporan'); };
   $('#bagiLap').onclick = function () {
     var t = pesanLaporan().teks;
-    if (navigator.share) navigator.share({ title: 'Laporan kas ' + namaPeriode(bk()), text: t }).catch(function () {});
+    if (navigator.share) navigator.share({ title: 'Laporan kas ' + pesanLaporan().judul, text: t }).catch(function () {});
     else window.open('https://wa.me/?text=' + encodeURIComponent(t), '_blank', 'noopener');
   };
   $('#cetakLap').onclick = function () { window.print(); };
+  $('.lap-mode').addEventListener('click', function (e) { var c = e.target.closest('[data-lap]'); if (!c) return; S.lap = c.dataset.lap; renderSisi(); });
   // Form kas
   function angka(v) { return Number(String(v).replace(/\D/g, '')) || 0; }
   $('#formKas').jumlah.addEventListener('input', function () { var n = angka(this.value); this.value = n ? ribu(n) : ''; });
@@ -437,7 +482,7 @@ var KONFIG = {
     if (salah) { salah.setAttribute('aria-invalid', 'true'); g.textContent = !ket ? 'Isi keterangan transaksi.' : !n ? 'Jumlah harus lebih dari 0.' : 'Pilih tanggal.'; salah.focus(); return; }
     g.textContent = '';
     var x = { id: idBaru('k'), tgl: f.tgl.value, jenis: f.jenis.value, ket: ket, jumlah: n };
-    D.kas.push(x); simpan();
+    D.kas.push(x); simpan(); catat('Mencatat ' + (x.jenis === 'masuk' ? 'pemasukan ' : 'pengeluaran ') + rp(n) + ': ' + ket + ' (' + tglPendek(x.tgl) + ')');
     f.ket.value = ''; f.jumlah.value = '';
     if (x.tgl < bk() || x.tgl > akhirMinggu(bk())) { var sn = seninDari(x.tgl), p = sn.split('-'); S.tahun = +p[0]; S.bulan = +p[1] - 1; S.minggu = Math.max(0, mingguBulan(S.tahun, S.bulan).indexOf(sn)); }
     render(); toast((x.jenis === 'masuk' ? 'Pemasukan ' : 'Pengeluaran ') + rp(n) + ' dicatat');
@@ -446,8 +491,8 @@ var KONFIG = {
     var h = e.target.closest('[data-hapus-kas]'); if (!h || !ADMIN) return;
     var id = h.getAttribute('data-hapus-kas'), idx = -1, x;
     D.kas.forEach(function (k, i) { if (k.id === id) { idx = i; x = k; } });
-    if (!x) return; D.kas.splice(idx, 1); simpan(); render();
-    toast('Transaksi dihapus', { label: 'Urungkan', fn: function () { D.kas.splice(idx, 0, x); simpan(); render(); } });
+    if (!x) return; D.kas.splice(idx, 1); simpan(); catat('Menghapus transaksi: ' + x.ket + ' ' + rp(x.jumlah) + ' (' + tglPendek(x.tgl) + ')'); render();
+    toast('Transaksi dihapus', { label: 'Urungkan', fn: function () { D.kas.splice(idx, 0, x); simpan(); catat('Urungkan hapus transaksi: ' + x.ket); render(); } });
   });
   // Mode terang/gelap
   $('#btnMode').onclick = function () {
@@ -477,6 +522,70 @@ var KONFIG = {
     if (e.key === 'Escape') tutupModal();
     if (e.key === 'Tab') { var f = $$('button,a[href],input,textarea,select', m).filter(function (x) { return !x.disabled && x.offsetParent; }); if (!f.length) return; var a = f[0], z = f[f.length - 1]; if (e.shiftKey && document.activeElement === a) { e.preventDefault(); z.focus(); } else if (!e.shiftKey && document.activeElement === z) { e.preventDefault(); a.focus(); } }
   });
+  function bukaMenu(w) {
+    var b = bk(), l = lunasDi(b, w.id);
+    bukaModal(w.nama,
+      '<div class="menu-aksi">' +
+      (w.nonaktif ? '' : '<button class="btn btn-garis lebar" type="button" id="mMulti">' + IK.kalender + '<span>Bayar beberapa minggu</span></button>') +
+      (l || w.nonaktif ? '' : '<button class="btn btn-garis lebar" type="button" id="mWa">' + IK.wa + '<span>Kirim pengingat WhatsApp</span></button>') +
+      '<button class="btn btn-garis lebar" type="button" id="mUbah">' + IK.ubah + '<span>Ubah data</span></button>' +
+      '<button class="btn btn-garis lebar" type="button" id="mAktif"><span>' + (w.nonaktif ? 'Aktifkan kembali' : 'Nonaktifkan anggota') + '</span></button></div>' +
+      '<p class="sub">' + (w.nonaktif ? 'Anggota nonaktif tidak muncul di daftar minggu yang belum ada pembayarannya. Riwayat pembayarannya tetap tersimpan.' : 'Nonaktifkan anggota yang sudah keluar. Riwayat pembayarannya tetap tersimpan dan ia tidak lagi dihitung belum bayar.') + '</p>',
+      function (r) {
+        var m = $('#mMulti', r); if (m) m.onclick = function () { bukaMulti(w); };
+        var wa = $('#mWa', r); if (wa) wa.onclick = function () { bukaPengingat(w); };
+        $('#mUbah', r).onclick = function () { formWarga(w); };
+        $('#mAktif', r).onclick = function () {
+          var nonaktif = !w.nonaktif;
+          if (nonaktif && !confirm('Nonaktifkan ' + w.nama + '? Ia tidak lagi dihitung belum bayar. Riwayatnya tetap tersimpan dan bisa diaktifkan kembali.')) return;
+          var x = cariWarga(w.id) || w; if (nonaktif) x.nonaktif = true; else delete x.nonaktif;
+          simpan(); catat((nonaktif ? 'Menonaktifkan anggota: ' : 'Mengaktifkan kembali anggota: ') + x.nama); tutupModal(); render();
+          toast(x.nama + (nonaktif ? ' dinonaktifkan' : ' diaktifkan kembali'), { label: 'Urungkan', fn: function () { if (nonaktif) delete x.nonaktif; else x.nonaktif = true; simpan(); catat('Urungkan: ' + x.nama); render(); } });
+        };
+      });
+  }
+  function bukaMulti(w) {
+    var b0 = bk(), iuran = Number(D.pengaturan.iuran) || 0;
+    function tahunDari(k) { return akhirMinggu(k).slice(0, 4); }
+    bukaModal('Bayar beberapa minggu',
+      '<p class="sub"><b>' + esc(w.nama) + '</b> · mulai ' + namaPeriode(b0) + '. Minggu yang sudah lunas dilewati.</p>' +
+      '<form id="fMulti" novalidate class="form-kas">' +
+      '<label class="field"><span>Jumlah minggu (1–26)</span><input name="jml" inputmode="numeric" maxlength="2" autocomplete="off" value="4"></label>' +
+      '<ul class="ringkas-minggu" id="mDaftar" aria-live="polite"></ul>' +
+      '<p class="galat" id="gMulti" role="alert"></p>' +
+      '<button class="btn lebar" type="submit">Tandai lunas</button></form>',
+      function (r) {
+        var f = $('#fMulti', r);
+        function minggu() { var n = Math.min(26, angka(f.jml.value)), a = []; for (var i = 0; i < n; i++) a.push(tambahHari(b0, 7 * i)); return a; }
+        function tampil() {
+          var a = minggu(), baru = a.filter(function (k) { return !lunasDi(k, w.id); });
+          $('#mDaftar', r).innerHTML = a.map(function (k) { var sdh = lunasDi(k, w.id); return '<li' + (sdh ? ' class="lewat"' : '') + '><span>' + rentang(k) + ' ' + tahunDari(k) + '</span><b>' + (sdh ? 'sudah lunas' : rp(iuran)) + '</b></li>'; }).join('') + (a.length ? '<li class="total"><span>Total (' + baru.length + ' minggu)</span><b>' + rp(baru.length * iuran) + '</b></li>' : '');
+        }
+        f.jml.addEventListener('input', function () { this.value = this.value.replace(/\D/g, '').slice(0, 2); tampil(); });
+        tampil();
+        f.addEventListener('submit', function (e) {
+          e.preventDefault(); var n = angka(f.jml.value);
+          if (n < 1 || n > 26) { $('#gMulti', r).textContent = 'Isi jumlah minggu 1 sampai 26.'; f.jml.setAttribute('aria-invalid', 'true'); return; }
+          var x = cariWarga(w.id) || w, baru = minggu().filter(function (k) { return !lunasDi(k, x.id); });
+          if (!baru.length) { $('#gMulti', r).textContent = 'Semua minggu itu sudah lunas.'; return; }
+          baru.forEach(function (k) { setLunas(x, k, true, undefined, true); });
+          simpan(); catat('Bayar beberapa minggu: ' + x.nama + ' · ' + baru.length + ' minggu (' + rentang(baru[0]) + ' s/d ' + rentang(baru[baru.length - 1]) + '), ' + rp(baru.length * iuran));
+          tutupModal(); render();
+          toast(x.nama + ' lunas ' + baru.length + ' minggu · ' + rp(baru.length * iuran), { label: 'Urungkan', fn: function () { baru.forEach(function (k) { setLunas(x, k, false, undefined, true); }); simpan(); catat('Urungkan bayar beberapa minggu: ' + x.nama); render(); } });
+        });
+      });
+  }
+  function waktuLokal(iso) { if (!iso) return 'baru saja'; var d = new Date(iso); return d.getDate() + ' ' + BULAN[d.getMonth()].slice(0, 3) + ' ' + d.getFullYear() + ', ' + pad(d.getHours()) + '.' + pad(d.getMinutes()); }
+  function bukaRiwayat() {
+    bukaModal('Riwayat perubahan',
+      '<p class="sub">Dicatat otomatis setiap pengurus mengubah data. Catatan tidak bisa diubah atau dihapus. Menampilkan 100 terakhir.</p><ul class="riwayat" id="lRiwayat"><li>Memuat…</li></ul>',
+      function (r) {
+        BACKEND.riwayat(100).then(function (a) {
+          $('#lRiwayat', r).innerHTML = a.length ? a.map(function (x) { return '<li><small>' + esc(waktuLokal(x.waktu)) + ' · ' + esc(String(x.oleh).split('@')[0]) + '</small><span>' + esc(x.aksi) + '</span></li>'; }).join('') : '<li>Belum ada catatan.</li>';
+        }).catch(function (e) { $('#lRiwayat', r).innerHTML = '<li>Gagal memuat riwayat: ' + esc(pesanGalat(e)) + '</li>'; });
+      });
+  }
+  $('#btnRiwayat').onclick = function () { if (ADMIN && window.BACKEND && BACKEND.riwayat) bukaRiwayat(); };
   function bukaPengingat(w) {
     var t = pesanPengingat(w), n = noWA(w.hp);
     bukaModal('Pengingat untuk ' + w.nama,
@@ -507,12 +616,12 @@ var KONFIG = {
           if (salah) { salah.setAttribute('aria-invalid', 'true'); $('#gW', r).textContent = 'Nama anggota wajib diisi.'; salah.focus(); return; }
           if (baru) { w = { id: idBaru('w') }; D.warga.push(w); } else { w = cariWarga(w.id) || w; }
           w.nama = nama; w.hp = f.hp.value.trim();
-          simpan(); tutupModal(); render(); toast(baru ? nama + ' ditambahkan' : 'Data ' + nama + ' disimpan');
+          simpan(); catat(baru ? 'Menambah anggota: ' + nama : 'Mengubah data anggota: ' + nama); tutupModal(); render(); toast(baru ? nama + ' ditambahkan' : 'Data ' + nama + ' disimpan');
         });
         var h = $('#hapusW', r);
         if (h) h.onclick = function () {
           if (!confirm('Hapus ' + w.nama + ' dari daftar? Riwayat iuran yang sudah masuk kas tetap tercatat.')) return;
-          D.warga = D.warga.filter(function (x) { return x.id !== w.id; }); simpan(); tutupModal(); render(); toast(w.nama + ' dihapus');
+          D.warga = D.warga.filter(function (x) { return x.id !== w.id; }); simpan(); catat('Menghapus anggota: ' + w.nama); tutupModal(); render(); toast(w.nama + ' dihapus');
         };
       });
   }
@@ -534,13 +643,15 @@ var KONFIG = {
         f.addEventListener('submit', function (e) {
           e.preventDefault(); var n = angka(f.iuran.value), bt = f.batas.value.trim();
           if (!n) { $('#gA', r).textContent = 'Iuran harus lebih dari 0.'; f.iuran.setAttribute('aria-invalid', 'true'); return; }
+          var lama = Object.assign({}, D.pengaturan);
           Object.assign(D.pengaturan, { iuran: n, batas: bt, bendahara: f.bendahara.value.trim() || 'Bendahara', bayarKe: f.bayarKe.value.trim() });
-          simpan(); tutupModal(); render(); toast('Pengaturan disimpan');
+          var ub = []; if (Number(lama.iuran) !== n) ub.push('iuran ' + rp(lama.iuran) + ' → ' + rp(n)); if ((lama.batas || '') !== bt) ub.push('batas bayar'); if (lama.bendahara !== D.pengaturan.bendahara) ub.push('nama bendahara'); if ((lama.bayarKe || '') !== D.pengaturan.bayarKe) ub.push('cara bayar');
+          simpan(); if (ub.length) catat('Mengubah pengaturan: ' + ub.join(', ')); tutupModal(); render(); toast('Pengaturan disimpan');
         });
-        $('#isiContoh', r).onclick = function () { if (!confirm('Ganti semua data dengan data contoh? Buat Backup JSON dulu bila perlu.')) return; D = window.DATA_CONTOH(); migrasi(D); simpan(); tutupModal(); render(); toast('Data contoh dimuat'); };
+        $('#isiContoh', r).onclick = function () { if (!confirm('Ganti semua data dengan data contoh? Buat Backup JSON dulu bila perlu.')) return; D = window.DATA_CONTOH(); migrasi(D); simpan(); catat('Mengganti semua data dengan data contoh'); tutupModal(); render(); toast('Data contoh dimuat'); };
         $('#kosongkan', r).onclick = function () {
           if (!confirm('Hapus SEMUA anggota, iuran, dan kas di perangkat ini? Tidak bisa dibatalkan kecuali kamu punya Backup JSON.')) return;
-          D = { versi: 1, pengaturan: D.pengaturan, warga: [], bayar: {}, kas: [] }; simpan(); tutupModal(); render(); toast('Semua data dikosongkan');
+          D = { versi: 1, pengaturan: D.pengaturan, warga: [], bayar: {}, kas: [] }; simpan(); catat('Mengosongkan semua data'); tutupModal(); render(); toast('Semua data dikosongkan');
         };
       });
   };
@@ -568,7 +679,7 @@ var KONFIG = {
       var d = JSON.parse(t);
       if (!d || !Array.isArray(d.warga) || !Array.isArray(d.kas)) throw new Error('format');
       if (!confirm('Pulihkan dari ' + f.name + '? Data sekarang akan diganti (' + d.warga.length + ' anggota, ' + d.kas.length + ' transaksi).')) return;
-      migrasi(d); D = d; simpan(); render(); toast('Data dipulihkan dari backup');
+      migrasi(d); D = d; simpan(); catat('Memulihkan data dari backup (' + d.warga.length + ' anggota, ' + d.kas.length + ' transaksi)'); render(); toast('Data dipulihkan dari backup');
     }).catch(function () { toast('Berkas bukan backup Iuran & Kas MPN yang valid'); }).then(function () { self.value = ''; });
   };
 
